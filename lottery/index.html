@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>離線抽獎工具</title>
+  <style>
+    :root{
+      --bg:#0b1020; --card:#121a33; --muted:#93a4c7; --text:#e8efff;
+      --accent:#5eead4; --danger:#fb7185; --warn:#fbbf24; --ok:#34d399;
+      --border:rgba(255,255,255,.12);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans TC", "Microsoft JhengHei", Arial;
+      background: radial-gradient(1000px 600px at 10% 0%, rgba(94,234,212,.12), transparent 60%),
+                  radial-gradient(900px 500px at 90% 10%, rgba(99,102,241,.14), transparent 60%),
+                  var(--bg);
+      color:var(--text);
+    }
+    .wrap{max-width:1100px; margin:0 auto; padding:22px}
+    h1{font-size:22px; margin:0 0 10px}
+    .sub{color:var(--muted); margin:0 0 18px; line-height:1.5}
+    .grid{display:grid; grid-template-columns: 1.1fr .9fr; gap:14px}
+    @media (max-width: 980px){.grid{grid-template-columns:1fr}}
+    .card{
+      background: rgba(18,26,51,.92);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.25);
+    }
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    label{font-size:12px; color:var(--muted)}
+    input, textarea, select{
+      width:100%;
+      background: rgba(255,255,255,.06);
+      color:var(--text);
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:10px 12px;
+      outline:none;
+    }
+    textarea{min-height:160px; resize:vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace}
+    input:focus, textarea:focus, select:focus{border-color: rgba(94,234,212,.5)}
+    .btn{
+      cursor:pointer;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      user-select:none;
+    }
+    .btn:hover{background: rgba(255,255,255,.10)}
+    .btn.primary{border-color: rgba(94,234,212,.45); background: rgba(94,234,212,.12)}
+    .btn.danger{border-color: rgba(251,113,133,.45); background: rgba(251,113,133,.10)}
+    .btn.warn{border-color: rgba(251,191,36,.45); background: rgba(251,191,36,.10)}
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      border:1px solid var(--border);
+      padding:6px 10px; border-radius:999px;
+      color:var(--muted); font-size:12px;
+      background: rgba(255,255,255,.04);
+    }
+    .split{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+    @media (max-width: 620px){.split{grid-template-columns:1fr}}
+    table{width:100%; border-collapse:collapse; font-size:13px}
+    th,td{border-bottom:1px solid var(--border); padding:10px 8px; vertical-align:top}
+    th{color:var(--muted); text-align:left; font-weight:600}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace}
+    .small{font-size:12px; color:var(--muted); line-height:1.5}
+    .right{margin-left:auto}
+    .status{white-space:pre-wrap; font-size:12px; color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>離線抽獎工具（Local-Only）</h1>
+    <p class="sub">
+      ✅ 不依賴外部資源、不上傳資料、可直接在地端開啟。<br>
+      建議：用專用電腦/離線環境執行，匯出檔案請妥善保存（避免洩漏參與者名單）。
+    </p>
+
+    <div class="grid">
+      <div class="card">
+        <div class="row" style="gap:12px">
+          <div style="flex:1; min-width:240px">
+            <label>抽獎活動標題</label>
+            <input id="eventTitle" placeholder="例如：2026 ASUS Learning Trip 抽獎" />
+          </div>
+          <div class="pill right" title="本工具僅在瀏覽器內運行，不會連線">
+            🔒 Offline Only
+          </div>
+        </div>
+
+        <div class="split" style="margin-top:12px">
+          <div>
+            <label>參與抽獎者（每行一位；可用「ID,Name」或單純 Name）</label>
+            <textarea id="participantsInput" placeholder="例如：&#10;E001,Alan Kuo&#10;E002,Grace Chen&#10;Tom"></textarea>
+            <div class="row" style="margin-top:10px">
+              <button class="btn primary" id="btnLoadParticipants">載入/更新參與者</button>
+              <button class="btn" id="btnExportParticipantsCSV">匯出參與者 CSV</button>
+              <button class="btn" id="btnExportParticipantsJSON">匯出參與者 JSON</button>
+            </div>
+
+            <div class="row" style="margin-top:10px">
+              <input type="file" id="fileImportParticipants" accept=".csv,.json,.txt" />
+              <button class="btn" id="btnImportParticipants">匯入參與者（CSV/JSON/TXT）</button>
+            </div>
+            <p class="small">
+              CSV 格式建議：<span class="mono">id,name</span>（可省略 id）。TXT 視為每行一筆。
+            </p>
+          </div>
+
+          <div>
+            <label>獎項設定</label>
+            <div class="row">
+              <input id="prizeName" placeholder="獎項名稱（例如：頭獎 AirPods）" style="flex:1; min-width:220px" />
+              <input id="prizeQty" type="number" min="1" value="1" placeholder="數量" style="width:140px" />
+              <button class="btn primary" id="btnAddPrize">新增獎項</button>
+            </div>
+
+            <div style="margin-top:10px; max-height:220px; overflow:auto; border:1px solid var(--border); border-radius:12px">
+              <table>
+                <thead>
+                  <tr><th style="width:56%">獎項</th><th style="width:16%">數量</th><th style="width:28%">操作</th></tr>
+                </thead>
+                <tbody id="prizeTable"></tbody>
+              </table>
+            </div>
+
+            <div class="row" style="margin-top:12px">
+              <button class="btn warn" id="btnResetDraw">重置抽獎（清空中獎者）</button>
+              <button class="btn danger" id="btnClearAll">清空全部（含參與者/獎項/中獎者）</button>
+            </div>
+
+            <p class="small">
+              抽獎邏輯：同一人只會中一次（避免重複）。若要允許重複中獎，可自行改程式（我也可以幫你改）。
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div style="flex:1; min-width:220px">
+            <label>選擇要抽的獎項</label>
+            <select id="prizeSelect"></select>
+          </div>
+          <button class="btn primary" id="btnDraw">開始抽獎</button>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <div class="pill" id="statsPill">參與者：0｜可抽：0｜已中：0</div>
+          <div class="pill" id="titlePill">標題：未設定</div>
+        </div>
+
+        <div style="margin-top:12px">
+          <label>抽獎狀態 / 記錄</label>
+          <div class="status card" style="padding:12px; border-radius:12px; background:rgba(255,255,255,.04)" id="statusLog"></div>
+        </div>
+
+        <div style="margin-top:12px">
+          <label>中獎者</label>
+          <div style="max-height:260px; overflow:auto; border:1px solid var(--border); border-radius:12px">
+            <table>
+              <thead>
+                <tr><th style="width:28%">獎項</th><th style="width:22%">ID</th><th>姓名</th></tr>
+              </thead>
+              <tbody id="winnerTable"></tbody>
+            </table>
+          </div>
+
+          <div class="row" style="margin-top:12px">
+            <button class="btn" id="btnExportWinnersCSV">匯出中獎者 CSV</button>
+            <button class="btn" id="btnExportWinnersJSON">匯出中獎者 JSON</button>
+            <button class="btn" id="btnCopyWinners">複製中獎者名單</button>
+            <button class="btn" id="btnExportWinnersTXT">匯出中獎者文字</button>
+            <input type="file" id="fileImportWinners" accept=".csv,.json" class="right" />
+            <button class="btn" id="btnImportWinners">匯入中獎者（CSV/JSON）</button>
+          </div>
+
+          <p class="small">
+            資安建議：匯出檔案含個資（ID/姓名），請以加密壓縮或存放於受控位置。
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+
+  const state = {
+    title: "",
+    participants: [],
+    prizes: [],
+    winners: []
+  };
+
+  const statusLog = [];
+  const log = (msg) => {
+    const ts = new Date().toLocaleString();
+    statusLog.unshift(`[${ts}] ${msg}`);
+    $("statusLog").textContent = statusLog.slice(0, 60).join("\n");
+  };
+
+  const sanitize = (s) => (s ?? "").toString().trim();
+
+  const randInt = (maxExclusive) => {
+    const a = new Uint32Array(1);
+    crypto.getRandomValues(a);
+    return a[0] % maxExclusive;
+  };
+
+  const downloadText = (filename, text, mime="text/plain;charset=utf-8") => {
+    const blob = new Blob([text], {type: mime});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const encodeUTF16LE = (text) => {
+    const buf = new Uint8Array(2 + text.length * 2);
+    buf[0] = 0xFF;
+    buf[1] = 0xFE;
+    for (let i = 0; i < text.length; i++) {
+      const code = text.charCodeAt(i);
+      buf[2 + i * 2] = code & 0xFF;
+      buf[3 + i * 2] = code >> 8;
+    }
+    return buf;
+  };
+
+  const downloadExcelCSV = (filename, text) => {
+    const normalized = text.replace(/\r?\n/g, "\r\n");
+    const bytes = encodeUTF16LE(normalized);
+    const blob = new Blob([bytes], { type: "text/csv;charset=utf-16le" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const toCSV = (rows, headers) => {
+    const esc = (v) => {
+      const s = (v ?? "").toString();
+      if (/[,"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    };
+    const head = headers.map(esc).join(",");
+    const body = rows.map(r => headers.map(h => esc(r[h])).join(",")).join("\n");
+    return head + "\n" + body + "\n";
+  };
+
+  const parseCSV = (text) => {
+    const rows = [];
+    let i = 0, field = "", row = [], inQuotes = false;
+
+    while (i < text.length) {
+      const c = text[i];
+
+      if (inQuotes) {
+        if (c === '"') {
+          if (text[i+1] === '"') { field += '"'; i += 2; continue; }
+          inQuotes = false; i++; continue;
+        }
+        field += c; i++; continue;
+      } else {
+        if (c === '"') { inQuotes = true; i++; continue; }
+        if (c === ',') { row.push(field); field = ""; i++; continue; }
+        if (c === '\n') { row.push(field); rows.push(row); row = []; field = ""; i++; continue; }
+        if (c === '\r') { i++; continue; }
+        field += c; i++; continue;
+      }
+    }
+    if (field.length || row.length) { row.push(field); rows.push(row); }
+    return rows;
+  };
+
+  const normalizeParticipant = (id, name) => {
+    const nid = sanitize(id);
+    const nname = sanitize(name);
+    const key = (nid ? `id:${nid}` : `name:${nname.toLowerCase()}`);
+    return { id: nid, name: nname, key };
+  };
+
+  const escapeHtml = (s) => {
+    return (s ?? "").toString()
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#39;");
+  };
+
+  const safeFilename = (name) => {
+    const s = (name || "export").toString().trim().slice(0, 80);
+    return s.replace(/[\\\/:*?"<>|]/g, "_").replace(/\s+/g, "_");
+  };
+
+  const rebuildUI = () => {
+    $("titlePill").textContent = `標題：${state.title ? state.title : "未設定"}`;
+
+    const winnerKeys = new Set(state.winners.map(w => w.key));
+    const available = state.participants.filter(p => !winnerKeys.has(p.key));
+    $("statsPill").textContent = `參與者：${state.participants.length}｜可抽：${available.length}｜已中：${state.winners.length}`;
+
+    const tb = $("prizeTable");
+    tb.innerHTML = "";
+    state.prizes.forEach((p) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(p.name)}</td>
+        <td class="mono">${p.qty}</td>
+        <td>
+          <button class="btn" data-act="edit" data-id="${p.id}">編輯</button>
+          <button class="btn danger" data-act="del" data-id="${p.id}">刪除</button>
+        </td>`;
+      tb.appendChild(tr);
+    });
+
+    const sel = $("prizeSelect");
+    const current = sel.value;
+    sel.innerHTML = "";
+    const opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = state.prizes.length ? "請選擇獎項…" : "尚未新增獎項";
+    sel.appendChild(opt0);
+    state.prizes.forEach(p => {
+      const opt = document.createElement("option");
+      opt.value = p.id;
+      opt.textContent = `${p.name}（數量：${p.qty}）`;
+      sel.appendChild(opt);
+    });
+    if ([...sel.options].some(o => o.value === current)) sel.value = current;
+
+    const wt = $("winnerTable");
+    wt.innerHTML = "";
+    state.winners.forEach(w => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(w.prizeName)}</td>
+        <td class="mono">${escapeHtml(w.id)}</td>
+        <td>${escapeHtml(w.name)}</td>`;
+      wt.appendChild(tr);
+    });
+  };
+
+  // Participants
+  const loadParticipantsFromTextarea = () => {
+    const raw = $("participantsInput").value || "";
+    const lines = raw.split(/\r\n|\n|\r/).map(l => l.trim()).filter(Boolean); // FIXED
+    const list = [];
+    for (const line of lines) {
+      const parts = line.split(",").map(x => x.trim());
+      if (parts.length >= 2) list.push(normalizeParticipant(parts[0], parts.slice(1).join(",")));
+      else list.push(normalizeParticipant("", parts[0]));
+    }
+    const seen = new Set();
+    const dedup = [];
+    for (const p of list) {
+      if (!p.name) continue;
+      if (seen.has(p.key)) continue;
+      seen.add(p.key);
+      dedup.push(p);
+    }
+    state.participants = dedup;
+    log(`已載入參與者 ${state.participants.length} 位（已去重）。`);
+    rebuildUI();
+  };
+
+  const importParticipants = async () => {
+    const file = $("fileImportParticipants").files?.[0];
+    if (!file) { alert("請先選擇檔案"); return; }
+    const text = await file.text();
+    const name = file.name.toLowerCase();
+
+    let imported = [];
+    try {
+      if (name.endsWith(".json")) {
+        const obj = JSON.parse(text);
+        const arr = Array.isArray(obj) ? obj : (obj.participants ?? []);
+        imported = arr.map(x => normalizeParticipant(x.id ?? "", x.name ?? x));
+      } else if (name.endsWith(".csv")) {
+        const rows = parseCSV(text);
+        if (!rows.length) throw new Error("空檔案");
+        const headers = rows[0].map(h => sanitize(h).toLowerCase());
+        const idxId = headers.indexOf("id");
+        const idxName = headers.indexOf("name");
+        for (let i=1;i<rows.length;i++){
+          const r = rows[i];
+          const id = idxId >= 0 ? (r[idxId] ?? "") : (r[0] ?? "");
+          const nm = idxName >= 0 ? (r[idxName] ?? "") : (r[1] ?? r[0] ?? "");
+          imported.push(normalizeParticipant(id, nm));
+        }
+      } else {
+        const lines = text.split(/\r\n|\n|\r/).map(l => l.trim()).filter(Boolean); // FIXED
+        imported = lines.map(line => {
+          const parts = line.split(",").map(x => x.trim());
+          if (parts.length >= 2) return normalizeParticipant(parts[0], parts.slice(1).join(","));
+          return normalizeParticipant("", parts[0]);
+        });
+      }
+    } catch (e) {
+      alert("匯入失敗：檔案格式不正確。");
+      console.error(e);
+      return;
+    }
+
+    const map = new Map(state.participants.map(p => [p.key, p]));
+    imported.forEach(p => {
+      if (!p.name) return;
+      if (!map.has(p.key)) map.set(p.key, p);
+    });
+    state.participants = [...map.values()];
+    log(`已匯入參與者：新增 ${imported.length} 筆（合併去重後共 ${state.participants.length} 位）。`);
+    rebuildUI();
+  };
+
+  // Prizes
+  const addPrize = () => {
+    const name = sanitize($("prizeName").value);
+    const qty = Number($("prizeQty").value);
+    if (!name) { alert("請輸入獎項名稱"); return; }
+    if (!Number.isFinite(qty) || qty <= 0) { alert("抽獎數量需為正整數"); return; }
+    const id = `p_${crypto.randomUUID()}`;
+    state.prizes.push({ id, name, qty: Math.floor(qty) });
+    $("prizeName").value = "";
+    $("prizeQty").value = "1";
+    log(`已新增獎項：「${name}」× ${Math.floor(qty)}。`);
+    rebuildUI();
+  };
+
+  const onPrizeTableClick = (ev) => {
+    const btn = ev.target.closest("button");
+    if (!btn) return;
+    const act = btn.dataset.act;
+    const id = btn.dataset.id;
+    const prize = state.prizes.find(p => p.id === id);
+    if (!prize) return;
+
+    if (act === "del") {
+      const before = state.winners.length;
+      state.winners = state.winners.filter(w => w.prizeId !== id);
+      state.prizes = state.prizes.filter(p => p.id !== id);
+      log(`已刪除獎項「${prize.name}」。同時移除該獎項中獎記錄 ${before - state.winners.length} 筆。`);
+      rebuildUI();
+      return;
+    }
+
+    if (act === "edit") {
+      const newName = prompt("編輯獎項名稱：", prize.name);
+      if (newName === null) return;
+      const newQtyStr = prompt("編輯抽獎數量（正整數）：", String(prize.qty));
+      if (newQtyStr === null) return;
+
+      const nName = sanitize(newName);
+      const nQty = Number(newQtyStr);
+      if (!nName) { alert("獎項名稱不可為空"); return; }
+      if (!Number.isFinite(nQty) || nQty <= 0) { alert("數量需為正整數"); return; }
+
+      prize.name = nName;
+      prize.qty = Math.floor(nQty);
+      state.winners.forEach(w => { if (w.prizeId === id) w.prizeName = nName; });
+
+      log(`已更新獎項：${nName} × ${prize.qty}`);
+      rebuildUI();
+    }
+  };
+
+  // Draw
+  const draw = () => {
+    const prizeId = $("prizeSelect").value;
+    const prize = state.prizes.find(p => p.id === prizeId);
+    if (!prize) { alert("請先選擇獎項"); return; }
+    if (!state.participants.length) { alert("請先載入參與者名單"); return; }
+
+    const winnerKeys = new Set(state.winners.map(w => w.key));
+    const pool = state.participants.filter(p => !winnerKeys.has(p.key));
+    if (pool.length === 0) { alert("沒有可抽的參與者（可能都已中獎）。"); return; }
+
+    const drawCount = Math.min(prize.qty, pool.length);
+    const picked = [];
+    const poolCopy = pool.slice();
+
+    for (let i=0; i<drawCount; i++) {
+      const idx = randInt(poolCopy.length);
+      const p = poolCopy[idx];
+      picked.push(p);
+      poolCopy.splice(idx, 1);
+    }
+
+    const ts = Date.now();
+    picked.forEach(p => {
+      state.winners.push({
+        prizeId: prize.id,
+        prizeName: prize.name,
+        id: p.id,
+        name: p.name,
+        key: p.key,
+        ts
+      });
+    });
+
+    log(`抽出「${prize.name}」中獎者 ${picked.length} 位：` + picked.map(x => x.id ? `${x.id} ${x.name}` : x.name).join("、"));
+    rebuildUI();
+  };
+
+  const resetDraw = () => {
+    if (!confirm("確定要清空所有中獎者記錄？（參與者/獎項保留）")) return;
+    state.winners = [];
+    log("已重置抽獎（清空中獎者）。");
+    rebuildUI();
+  };
+
+  const clearAll = () => {
+    if (!confirm("確定要清空全部資料？（參與者/獎項/中獎者/標題）")) return;
+    state.title = "";
+    state.participants = [];
+    state.prizes = [];
+    state.winners = [];
+    $("eventTitle").value = "";
+    $("participantsInput").value = "";
+    log("已清空全部資料。");
+    rebuildUI();
+  };
+
+
+  const formatWinnersText = () => {
+    if (!state.winners.length) return "目前沒有中獎者資料";
+    return state.winners.map((w, idx) => {
+      const parts = [String(idx + 1), w.prizeName || "", w.id || "", w.name || ""];
+      return parts.join("\t");
+    }).join("\n");
+  };
+
+  // Export / Import winners
+  const exportParticipantsCSV = () => {
+    const csv = toCSV(state.participants, ["id","name"]);
+    downloadExcelCSV(safeFilename(`participants_${state.title||"event"}.csv`), csv);
+    log("已匯出參與者 CSV（Excel 相容編碼）。");
+  };
+  const exportParticipantsJSON = () => {
+    const json = JSON.stringify({ title: state.title, participants: state.participants }, null, 2);
+    downloadText(safeFilename(`participants_${state.title||"event"}.json`), json, "application/json;charset=utf-8");
+    log("已匯出參與者 JSON。");
+  };
+
+  const exportWinnersCSV = () => {
+    const rows = state.winners.map(w => ({
+      prize: w.prizeName,
+      id: w.id,
+      name: w.name,
+      ts: new Date(w.ts).toISOString()
+    }));
+    const csv = toCSV(rows, ["prize","id","name","ts"]);
+    downloadExcelCSV(safeFilename(`winners_${state.title||"event"}.csv`), csv);
+    log("已匯出中獎者 CSV（Excel 相容編碼）。");
+  };
+  const exportWinnersJSON = () => {
+    const json = JSON.stringify({ title: state.title, winners: state.winners }, null, 2);
+    downloadText(safeFilename(`winners_${state.title||"event"}.json`), json, "application/json;charset=utf-8");
+    log("已匯出中獎者 JSON。");
+  };
+
+  const copyWinners = async () => {
+    const header = "序號\t獎項\tID\t姓名";
+    const text = header + "\n" + formatWinnersText();
+    try {
+      await navigator.clipboard.writeText(text);
+      log("已複製中獎者名單到剪貼簿。");
+      alert("已複製中獎者名單，可直接貼到 Excel 或記事本。");
+    } catch (e) {
+      alert("複製失敗，請改用『匯出中獎者文字』功能。");
+      console.error(e);
+    }
+  };
+
+  const exportWinnersTXT = () => {
+    const header = "序號\t獎項\tID\t姓名";
+    const text = header + "\n" + formatWinnersText() + "\n";
+    downloadText(safeFilename(`winners_${state.title||"event"}.txt`), text, "text/plain;charset=utf-8");
+    log("已匯出中獎者文字檔。");
+  };
+
+  const importWinners = async () => {
+    const file = $("fileImportWinners").files?.[0];
+    if (!file) { alert("請先選擇檔案"); return; }
+    const text = await file.text();
+    const name = file.name.toLowerCase();
+
+    let imported = [];
+    try {
+      if (name.endsWith(".json")) {
+        const obj = JSON.parse(text);
+        const arr = Array.isArray(obj) ? obj : (obj.winners ?? []);
+        imported = arr.map(w => ({
+          prizeId: sanitize(w.prizeId ?? ""),
+          prizeName: sanitize(w.prizeName ?? w.prize ?? ""),
+          id: sanitize(w.id ?? ""),
+          name: sanitize(w.name ?? ""),
+          key: sanitize(w.key ?? (w.id ? `id:${w.id}` : `name:${(w.name||"").toLowerCase()}`)),
+          ts: w.ts ? Date.parse(w.ts) || Number(w.ts) || Date.now() : Date.now()
+        })).filter(w => w.name);
+      } else if (name.endsWith(".csv")) {
+        const rows = parseCSV(text);
+        if (!rows.length) throw new Error("空檔案");
+        const headers = rows[0].map(h => sanitize(h).toLowerCase());
+        const idxPrize = headers.indexOf("prize");
+        const idxId = headers.indexOf("id");
+        const idxName = headers.indexOf("name");
+        const idxTs = headers.indexOf("ts");
+        for (let i=1;i<rows.length;i++){
+          const r = rows[i];
+          const prizeName = idxPrize>=0 ? (r[idxPrize] ?? "") : (r[0] ?? "");
+          const id = idxId>=0 ? (r[idxId] ?? "") : (r[1] ?? "");
+          const nm = idxName>=0 ? (r[idxName] ?? "") : (r[2] ?? "");
+          const ts = idxTs>=0 ? (Date.parse(r[idxTs] ?? "") || Date.now()) : Date.now();
+          const key = id ? `id:${sanitize(id)}` : `name:${sanitize(nm).toLowerCase()}`;
+          imported.push({ prizeId:"", prizeName: sanitize(prizeName), id: sanitize(id), name: sanitize(nm), key, ts });
+        }
+      } else {
+        throw new Error("不支援格式");
+      }
+    } catch (e) {
+      alert("匯入失敗：檔案格式不正確。");
+      console.error(e);
+      return;
+    }
+
+    const sig = (w) => `${w.key}@@${w.prizeName}@@${w.ts}`;
+    const seen = new Set(state.winners.map(sig));
+    let added = 0;
+    for (const w of imported) {
+      if (!w.name) continue;
+      const s = sig(w);
+      if (seen.has(s)) continue;
+      seen.add(s);
+      state.winners.push(w);
+      added++;
+    }
+
+    log(`已匯入中獎者：新增 ${added} 筆（匯入檔共 ${imported.length} 筆）。`);
+    rebuildUI();
+  };
+
+  // Bindings
+  $("eventTitle").addEventListener("input", (e) => {
+    state.title = sanitize(e.target.value);
+    rebuildUI();
+  });
+
+  $("btnLoadParticipants").addEventListener("click", loadParticipantsFromTextarea);
+  $("btnImportParticipants").addEventListener("click", importParticipants);
+  $("btnExportParticipantsCSV").addEventListener("click", exportParticipantsCSV);
+  $("btnExportParticipantsJSON").addEventListener("click", exportParticipantsJSON);
+
+  $("btnAddPrize").addEventListener("click", addPrize);
+  $("prizeTable").addEventListener("click", onPrizeTableClick);
+
+  $("btnDraw").addEventListener("click", draw);
+  $("btnResetDraw").addEventListener("click", resetDraw);
+  $("btnClearAll").addEventListener("click", clearAll);
+
+  $("btnExportWinnersCSV").addEventListener("click", exportWinnersCSV);
+  $("btnExportWinnersJSON").addEventListener("click", exportWinnersJSON);
+  $("btnCopyWinners").addEventListener("click", copyWinners);
+  $("btnExportWinnersTXT").addEventListener("click", exportWinnersTXT);
+  $("btnImportWinners").addEventListener("click", importWinners);
+
+  log("工具已就緒：請先輸入標題、載入參與者、設定獎項後開始抽獎。");
+  rebuildUI();
+})();
+</script>
+</body>
+</html>
